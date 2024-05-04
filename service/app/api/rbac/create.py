@@ -4,7 +4,7 @@ from app import db
 from app.models import RolePermission, RoleUser, Role
 from .. import api
 
-@api.route('/role/create', methods=['POST'])
+@api.route('/role/create/', methods=['POST'])
 def create_role():
     role_name = request.json.get('name')
     role = Role(name=role_name)
