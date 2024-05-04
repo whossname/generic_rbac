@@ -6,11 +6,19 @@ from typing import List
 
 class Permission(db.Model):
     __tablename__ = 'permission'
+    id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(64), unique=True)
+
+    def to_json(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+        }
 
 
 class Role(db.Model):
     __tablename__ = 'role'
+    id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(64), unique=True)
     # super_admin is a special role with access to all permissions
     is_super_admin: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -20,12 +28,29 @@ class Role(db.Model):
     role_users: Mapped[List['RoleUser']] = relationship(backref=db.backref('role'), lazy='dynamic')
     role_permissions: Mapped[List['RolePermission']] = relationship(backref=db.backref('role'))
 
+    def to_json(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'is_super_admin': self.is_super_admin,
+            'is_everyone': self.is_everyone,
+            'user_ids': [role_user.user_id for role_user in self.role_users],
+            'role_permissions': [role_permission.to_json_for_role() for role_permission in self.role_permissions],
+        }
+
 
 class RoleUser(db.Model):
     __tablename__ = 'role_user'
-    role_id: Mapped[int] = mapped_column(ForeignKey(Role.id))
+    role_id: Mapped[int] = mapped_column(ForeignKey(Role.id), primary_key=True)
     # user_id comes from external system, designed to handle a uuid
-    user_id: Mapped[int] = mapped_column(String(64), unique=True)
+    user_id: Mapped[int] = mapped_column(String(64), primary_key=True)
+
+    def to_json(self):
+        return {
+            'user_id': self.user_id,
+            'role_id': self.role_id,
+        }
+
 
     def is_super_admin(self):
         return any(role.is_super_admin for role in self.roles)
@@ -63,7 +88,20 @@ class RolePermission(db.Model):
     __tablename__ = 'role_permission'
     write_access: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    role_id: Mapped[int] = mapped_column(Integer, ForeignKey(Role.id))
-    permision_id: Mapped[int] = mapped_column(Integer, ForeignKey(Permission.id))
+    role_id: Mapped[int] = mapped_column(Integer, ForeignKey(Role.id), primary_key=True)
+    permission_id: Mapped[int] = mapped_column(Integer, ForeignKey(Permission.id), primary_key=True)
 
     permission: Mapped['Permission'] = relationship()
+
+    def to_json_for_role(self):
+        return {
+            'write_access': self.write_access,
+            'permission_id': self.permission_id,
+        }
+
+    def to_json(self):
+        return {
+            'write_access': self.write_access,
+            'permission_id': self.permission_id,
+            'role_id': self.role_id,
+        }

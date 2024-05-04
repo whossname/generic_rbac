@@ -1,7 +1,6 @@
-from flask import jsonify
+from flask import jsonify, current_app
 from app.exceptions import ValidationError
 from . import api
-
 
 def bad_request(message):
     response = jsonify({'error': 'bad request', 'message': message})
@@ -20,6 +19,12 @@ def forbidden(message):
     response.status_code = 403
     return response
 
+
+def internal_server_error(e):
+    current_app.logger.error(e)
+    response = jsonify({'error': 'internal server error'})
+    response.status_code = 500
+    return response
 
 @api.errorhandler(ValidationError)
 def validation_error(e):

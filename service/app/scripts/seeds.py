@@ -3,8 +3,6 @@ from . import scripts
 from .. import db
 from ..models import RoleUser, Permission, RolePermission, Role
 
-from flask import Blueprint
-
 
 @scripts.cli.command('seed')
 @click.argument('env')
