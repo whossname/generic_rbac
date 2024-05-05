@@ -51,10 +51,6 @@ class RoleUser(db.Model):
             'role_id': self.role_id,
         }
 
-
-    def is_super_admin(self):
-        return any(role.is_super_admin for role in self.roles)
-
     def get_role_permissions(self) -> set:
         permissions = []
 
@@ -64,7 +60,7 @@ class RoleUser(db.Model):
             permissions = [everyone_role[0].role_permissions]
 
         # add users's permissions
-        map(lambda role: permissions.append(role.role_permissions), self.roles)
+        permissions.append(self.role.role_permissions)
 
         # flatten permissions
         return [
@@ -74,14 +70,14 @@ class RoleUser(db.Model):
         ]
 
     def has_permission(self, permission_name, require_write_access) -> bool:
-        if self.is_super_admin():
+        if self.role.is_super_admin:
             return True
 
-        for role_permission in self.get_role_permissions:
+        for role_permission in self.get_role_permissions():
             if role_permission.permission.name == permission_name:
                 if not require_write_access or role_permission.write_access:
-                    True
-        False
+                    return True
+        return False
 
 
 class RolePermission(db.Model):

@@ -1,11 +1,8 @@
 import unittest
 import json
-import re
-from base64 import b64encode
 from app import create_app, db
 
-from app.scripts import seeds
-from app.models import RoleUser, Role, RolePermission, Permission
+from app.models import Permission
 
 
 class APITestCase(unittest.TestCase):
@@ -14,7 +11,6 @@ class APITestCase(unittest.TestCase):
         self.app_context = self.app.app_context()
         self.app_context.push()
         db.create_all()
-        # seeds.seed()
         self.client = self.app.test_client()
 
     def tearDown(self):
@@ -36,7 +32,6 @@ class APITestCase(unittest.TestCase):
         self.assertIn('<h1>Not Found</h1>', html)
 
     def test_redirect(self):
-        # create role
         response = self.client.post(
             '/api/v1/role/create',
             headers=self.get_api_headers(),
@@ -48,8 +43,8 @@ class APITestCase(unittest.TestCase):
         self.assertIsNotNone(url)
         self.assertEqual(url, 'http://localhost/api/v1/role/create/')
 
-    def test_roles(self):
-        # create role
+
+    def create_role(self):
         response = self.client.post(
             '/api/v1/role/create/',
             headers=self.get_api_headers(),
@@ -66,3 +61,145 @@ class APITestCase(unittest.TestCase):
         self.assertEqual(json_response['role_permissions'], [])
         self.assertEqual(json_response['user_ids'], [])
 
+    def add_permission(self, write_access):
+        response = self.client.post(
+            '/api/v1/role/add-permission/',
+            headers=self.get_api_headers(),
+            data=json.dumps({"role_id": 1, "permission_id": 1, "write_access": write_access})
+            )
+
+        self.assertEqual(response.status_code, 201)
+
+        json_response = json.loads(response.get_data(as_text=True))
+        self.assertEqual(json_response['permission_id'], 1)
+        self.assertEqual(json_response['role_id'], 1)
+        self.assertEqual(json_response['write_access'], write_access)
+
+    def add_user(self):
+        response = self.client.post(
+            '/api/v1/role/add-user/',
+            headers=self.get_api_headers(),
+            data=json.dumps({"role_id": 1, "user_id": "test-user"})
+            )
+
+        self.assertEqual(response.status_code, 201)
+
+        json_response = json.loads(response.get_data(as_text=True))
+        self.assertEqual(json_response['user_id'], 'test-user')
+        self.assertEqual(json_response['role_id'], 1)
+
+    def fetch_all(self, write_access, has_user_and_permission):
+        response = self.client.get(
+            '/api/v1/rbac/fetch-all/',
+            headers=self.get_api_headers()
+            )
+
+        self.assertEqual(response.status_code, 200)
+
+        json_response = json.loads(response.get_data(as_text=True))
+        self.assertEqual(json_response['permissions'], [{'id': 1, 'name': 'rbac'}])
+        role = json_response['roles'][0]
+
+        user_ids = []
+        role_permissions = []
+
+        if has_user_and_permission:
+            user_ids = ['test-user']
+            role_permissions = [{'permission_id': 1, 'write_access': write_access}]
+
+        expected_role = {
+            'id': 1,
+            'is_everyone': False,
+            'is_super_admin': False,
+            'name': 'test-role',
+            'role_permissions': role_permissions,
+            'user_ids': user_ids
+            }
+
+        self.assertEqual(role, expected_role)
+
+    def fetch_all_no_roles(self):
+        response = self.client.get(
+            '/api/v1/rbac/fetch-all/',
+            headers=self.get_api_headers()
+            )
+
+        self.assertEqual(response.status_code, 200)
+
+        json_response = json.loads(response.get_data(as_text=True))
+        self.assertEqual(json_response['permissions'], [{'id': 1, 'name': 'rbac'}])
+        self.assertEqual(json_response['roles'], [])
+
+    def has_permission(self, write_access):
+        response = self.client.get(
+            '/api/v1/user/has_permission/',
+            headers=self.get_api_headers(),
+            data=json.dumps(
+                {"user_id": "test-user", "permission": "rbac", "require_write_access": True}
+                )
+            )
+
+        self.assertEqual(response.status_code, 200)
+        json_response = json.loads(response.get_data(as_text=True))
+        self.assertEqual(json_response['has_permission'], write_access)
+
+    def remove_permission(self):
+        response = self.client.delete(
+            '/api/v1/role/remove-permission/',
+            headers=self.get_api_headers(),
+            data=json.dumps({"role_id": 1, "permission_id": 1})
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_data(as_text=True), 'Success')
+
+    def remove_user(self):
+        response = self.client.delete(
+            '/api/v1/role/remove-user/',
+            headers=self.get_api_headers(),
+            data=json.dumps({"role_id": 1, "user_id": 1})
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_data(as_text=True), 'Success')
+
+    def delete_role(self):
+        response = self.client.delete(
+            '/api/v1/role/delete/',
+            headers=self.get_api_headers(),
+            data=json.dumps({"role_id": 1})
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_data(as_text=True), 'Success')
+
+    def test_roles(self):
+        # setup
+        rbac_permission = Permission(name='rbac')
+        db.session.add(rbac_permission)
+        db.session.commit()
+
+        write_access = False
+
+        # create
+        self.create_role()
+        self.add_permission(write_access)
+        self.add_user()
+
+        # read
+        has_user_and_permission= True
+        self.fetch_all(write_access, has_user_and_permission)
+        self.has_permission(write_access)
+
+        # change permission write_access
+        write_access = True
+        self.add_permission(write_access)
+        self.has_permission(write_access)
+
+        # delete
+        self.remove_permission()
+        self.remove_user()
+        has_user_and_permission = False
+        self.fetch_all(write_access, has_user_and_permission)
+        self.delete_role()
+        self.fetch_all_no_roles()

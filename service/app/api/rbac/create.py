@@ -11,19 +11,33 @@ def create_role():
     db.session.add(role)
     return reply(role)
 
-@api.route('/role/<int:role_id>/add-user/', methods=['POST'])
-def add_user_to_role(role_id):
+@api.route('/role/add-user/', methods=['POST'])
+def add_user_to_role():
+    role_id = request.json.get('role_id')
     user_id = request.json.get('user_id')
     ru = RoleUser(role_id=role_id, user_id=user_id)
     db.session.add(ru)
     return reply(ru)
 
-@api.route('/role/<int:role_id>/add-permission/', methods=['POST'])
-def add_permission(role_id):
+@api.route('/role/add-permission/', methods=['POST'])
+def add_permission():
+    role_id = request.json.get('role_id')
     permission_id = request.json.get('permission_id')
     write_access = request.json.get('write_access')
-    rp = RolePermission(role_id=role_id, permission_id=permission_id, write_access=write_access)
-    db.session.add(rp)
+
+    # upsert
+    composite_key = {'role_id': role_id, 'permission_id': permission_id}
+    rp: RolePermission | None = db.session.query(RolePermission).get(composite_key)
+
+    # insert if doesn't exist
+    if rp is None:
+        rp = RolePermission(role_id=role_id, permission_id=permission_id, write_access=write_access)
+        db.session.add(rp)
+        return reply(rp)
+
+    # update if changed write access
+    rp.write_access = write_access
+
     return reply(rp)
 
 def reply(obj):
