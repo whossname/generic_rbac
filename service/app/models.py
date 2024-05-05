@@ -4,6 +4,17 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List
 
 
+def user_has_permission(user_id, permission_name, require_write_access):
+    user_roles = db.session.execute(select(RoleUser).where(RoleUser.user_id == user_id)).all()
+
+    for user_role in user_roles:
+        has_permission = user_role[0].has_permission(permission_name, require_write_access)
+        if has_permission:
+            return True
+
+    return False
+
+
 class Permission(db.Model):
     __tablename__ = 'permission'
     id: Mapped[int] = mapped_column(primary_key=True)

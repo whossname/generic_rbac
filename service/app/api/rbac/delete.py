@@ -5,8 +5,10 @@ from .. import api
 from ..errors import internal_server_error
 
 from sqlalchemy import delete
+from ..decorators import permission_required
 
 @api.route('/role/delete/', methods=['DELETE'])
+@permission_required('rbac', write_access=True)
 def delete_role():
     role_id = request.json.get('role_id')
     db.session.execute(delete(RoleUser).where(RoleUser.role_id == role_id))
@@ -15,6 +17,7 @@ def delete_role():
     return reply()
 
 @api.route('/role/remove-user/', methods=['DELETE'])
+@permission_required('rbac', write_access=True)
 def remove_user_from_role():
     role_id = request.json.get('role_id')
     user_id = request.json.get('user_id')
@@ -24,8 +27,8 @@ def remove_user_from_role():
     db.session.execute(smt)
     return reply()
 
-
 @api.route('/role/remove-permission/', methods=['DELETE'])
+@permission_required('rbac', write_access=True)
 def remove_permission_from_role():
     role_id = request.json.get('role_id')
     permission_id = request.json.get('permission_id')
@@ -34,7 +37,6 @@ def remove_permission_from_role():
             )
     db.session.execute(smt)
     return reply()
-
 
 def reply():
     try:

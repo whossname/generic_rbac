@@ -1,8 +1,8 @@
 from flask import abort, jsonify, request
 from app import db
-from app.models import Permission, RoleUser, Role
+from app.models import Permission, Role, user_has_permission
 from .. import api
-# from ..decorators import permission_required
+from ..decorators import permission_required
 
 from sqlalchemy import select
 
@@ -12,15 +12,12 @@ def has_permission():
     permission_name = request.json.get('permission')
     require_write_access = request.json.get('require_write_access')
 
-    role_user = db.session.execute(select(RoleUser).where(RoleUser.user_id == user_id)).first()
+    has_permission = user_has_permission(user_id, permission_name, require_write_access)
 
-    if role_user is None:
-        abort(404)
-
-    has_permission = role_user[0].has_permission(permission_name, require_write_access)
     return jsonify({'has_permission': has_permission})
 
 @api.route('/rbac/fetch-all/')
+@permission_required('rbac', write_access=False)
 def fetch_all():
     roles = db.session.execute(select(Role)).all()
     permissions = db.session.execute(select(Permission)).all()

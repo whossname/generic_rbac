@@ -2,7 +2,7 @@ import unittest
 import json
 from app import create_app, db
 
-from app.models import Permission
+from app.models import Permission, Role, RoleUser
 
 
 class APITestCase(unittest.TestCase):
@@ -21,7 +21,8 @@ class APITestCase(unittest.TestCase):
     def get_api_headers(self):
         return {
             'Accept': 'application/json',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-User-Id': 'admin'
         }
 
     def test_404(self):
@@ -30,6 +31,19 @@ class APITestCase(unittest.TestCase):
         html = response.get_data(as_text=True)
         self.assertIn('<title>404 Not Found</title>', html)
         self.assertIn('<h1>Not Found</h1>', html)
+
+    def test_403(self):
+        response = self.client.post(
+            '/api/v1/role/create/',
+            headers=self.get_api_headers(),
+            data=json.dumps({"name": "test-role"})
+            )
+
+        self.assertEqual(response.status_code, 403)
+        json_response = json.loads(response.get_data(as_text=True))
+        self.assertEqual(json_response['error'], 'forbidden')
+        self.assertEqual(json_response['message'], 'Insufficient permissions')
+
 
     def test_redirect(self):
         response = self.client.post(
@@ -43,6 +57,12 @@ class APITestCase(unittest.TestCase):
         self.assertIsNotNone(url)
         self.assertEqual(url, 'http://localhost/api/v1/role/create/')
 
+    def setup_admin_user(self):
+        admin = Role(name='admin', is_super_admin=True)
+        db.session.add(admin)
+        role_user = RoleUser(user_id='admin', role=admin)
+        db.session.add(role_user)
+        db.session.commit()
 
     def create_role(self):
         response = self.client.post(
@@ -54,7 +74,7 @@ class APITestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 201)
 
         json_response = json.loads(response.get_data(as_text=True))
-        self.assertEqual(json_response['id'], 1)
+        self.assertEqual(json_response['id'], 2)
         self.assertEqual(json_response['is_everyone'], False)
         self.assertEqual(json_response['is_super_admin'], False)
         self.assertEqual(json_response['name'], 'test-role')
@@ -65,28 +85,40 @@ class APITestCase(unittest.TestCase):
         response = self.client.post(
             '/api/v1/role/add-permission/',
             headers=self.get_api_headers(),
-            data=json.dumps({"role_id": 1, "permission_id": 1, "write_access": write_access})
+            data=json.dumps({"role_id": 2, "permission_id": 1, "write_access": write_access})
             )
 
         self.assertEqual(response.status_code, 201)
 
         json_response = json.loads(response.get_data(as_text=True))
         self.assertEqual(json_response['permission_id'], 1)
-        self.assertEqual(json_response['role_id'], 1)
+        self.assertEqual(json_response['role_id'], 2)
         self.assertEqual(json_response['write_access'], write_access)
 
     def add_user(self):
         response = self.client.post(
             '/api/v1/role/add-user/',
             headers=self.get_api_headers(),
-            data=json.dumps({"role_id": 1, "user_id": "test-user"})
+            data=json.dumps({"role_id": 2, "user_id": "test-user"})
             )
 
         self.assertEqual(response.status_code, 201)
 
         json_response = json.loads(response.get_data(as_text=True))
         self.assertEqual(json_response['user_id'], 'test-user')
-        self.assertEqual(json_response['role_id'], 1)
+        self.assertEqual(json_response['role_id'], 2)
+    
+    def check_admin_role(self, admin_role):
+        expected_admin_role = {
+            'id': 1,
+            'is_everyone': False,
+            'is_super_admin': True,
+            'name': 'admin',
+            'role_permissions': [],
+            'user_ids': ['admin']
+            }
+
+        self.assertEqual(admin_role, expected_admin_role)
 
     def fetch_all(self, write_access, has_user_and_permission):
         response = self.client.get(
@@ -98,7 +130,12 @@ class APITestCase(unittest.TestCase):
 
         json_response = json.loads(response.get_data(as_text=True))
         self.assertEqual(json_response['permissions'], [{'id': 1, 'name': 'rbac'}])
-        role = json_response['roles'][0]
+
+        roles = json_response['roles']
+        self.assertEqual(len(roles), 2)
+        self.check_admin_role(roles[0])
+
+        test_role = roles[1]
 
         user_ids = []
         role_permissions = []
@@ -107,8 +144,8 @@ class APITestCase(unittest.TestCase):
             user_ids = ['test-user']
             role_permissions = [{'permission_id': 1, 'write_access': write_access}]
 
-        expected_role = {
-            'id': 1,
+        expected_test_role = {
+            'id': 2,
             'is_everyone': False,
             'is_super_admin': False,
             'name': 'test-role',
@@ -116,7 +153,7 @@ class APITestCase(unittest.TestCase):
             'user_ids': user_ids
             }
 
-        self.assertEqual(role, expected_role)
+        self.assertEqual(test_role, expected_test_role)
 
     def fetch_all_no_roles(self):
         response = self.client.get(
@@ -128,7 +165,10 @@ class APITestCase(unittest.TestCase):
 
         json_response = json.loads(response.get_data(as_text=True))
         self.assertEqual(json_response['permissions'], [{'id': 1, 'name': 'rbac'}])
-        self.assertEqual(json_response['roles'], [])
+
+        roles = json_response['roles']
+        self.assertEqual(len(roles), 1)
+        self.check_admin_role(roles[0])
 
     def has_permission(self, write_access):
         response = self.client.get(
@@ -147,7 +187,7 @@ class APITestCase(unittest.TestCase):
         response = self.client.delete(
             '/api/v1/role/remove-permission/',
             headers=self.get_api_headers(),
-            data=json.dumps({"role_id": 1, "permission_id": 1})
+            data=json.dumps({"role_id": 2, "permission_id": 1})
             )
 
         self.assertEqual(response.status_code, 200)
@@ -157,7 +197,7 @@ class APITestCase(unittest.TestCase):
         response = self.client.delete(
             '/api/v1/role/remove-user/',
             headers=self.get_api_headers(),
-            data=json.dumps({"role_id": 1, "user_id": 1})
+            data=json.dumps({"role_id": 2, "user_id": 1})
             )
 
         self.assertEqual(response.status_code, 200)
@@ -167,7 +207,7 @@ class APITestCase(unittest.TestCase):
         response = self.client.delete(
             '/api/v1/role/delete/',
             headers=self.get_api_headers(),
-            data=json.dumps({"role_id": 1})
+            data=json.dumps({"role_id": 2})
             )
 
         self.assertEqual(response.status_code, 200)
@@ -180,6 +220,8 @@ class APITestCase(unittest.TestCase):
         db.session.commit()
 
         write_access = False
+
+        self.setup_admin_user()
 
         # create
         self.create_role()

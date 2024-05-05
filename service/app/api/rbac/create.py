@@ -3,8 +3,10 @@ from app.api.errors import internal_server_error, bad_request
 from app import db
 from app.models import RolePermission, RoleUser, Role
 from .. import api
+from ..decorators import permission_required
 
 @api.route('/role/create/', methods=['POST'])
+@permission_required('rbac', write_access=True)
 def create_role():
     role_name = request.json.get('name')
     role = Role(name=role_name)
@@ -12,6 +14,7 @@ def create_role():
     return reply(role)
 
 @api.route('/role/add-user/', methods=['POST'])
+@permission_required('rbac', write_access=True)
 def add_user_to_role():
     role_id = request.json.get('role_id')
     user_id = request.json.get('user_id')
@@ -20,6 +23,7 @@ def add_user_to_role():
     return reply(ru)
 
 @api.route('/role/add-permission/', methods=['POST'])
+@permission_required('rbac', write_access=True)
 def add_permission():
     role_id = request.json.get('role_id')
     permission_id = request.json.get('permission_id')
