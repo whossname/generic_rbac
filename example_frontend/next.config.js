@@ -1,15 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  async redirects() {
+  async redirects () {
     return [
       {
         source: '/',
         destination: '/rbac',
-        permanent: true,
-      },
+        permanent: true
+      }
     ]
-  },
+  }
 }
 
 module.exports = nextConfig
