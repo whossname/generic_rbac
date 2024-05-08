@@ -1,7 +1,7 @@
 export async function getStaticProps() {
   return {
     props: {
-      pageId: "rbac",
+      pageId: 'rbac',
       roles: []
     }
   }
@@ -34,14 +34,14 @@ export default function RBAC() {
       <h2>Roles</h2>
 
       {/* Add Role */}
-      <div className="m-2 pb-5">
-        <input placeholder="Role name" type="text" className="typeable"></input>
-        <button className="bg-green-50 hover:bg-green-100">Add Role</button>
+      <div className='m-2 pb-5'>
+        <input placeholder='Role name' type='text' className='typeable'></input>
+        <button className='bg-green-50 hover:bg-green-100'>Add Role</button>
       </div>
 
-      <table className="">
+      <table className=''>
         <thead><tr>
-          <th className="w-10"> </th>
+          <th className='w-10'> </th>
           <th > Role </th>
           <th > Users </th>
           <th > Permissions </th>
@@ -61,7 +61,7 @@ export default function RBAC() {
 function optionalRow(show: Boolean, body: JSX.Element) {
   {
     if (show) {
-      return <td className="btn-cel">{body}</td>
+      return <td className='btn-cel'>{body}</td>
     }
     else {
       return <td></td>
@@ -70,11 +70,11 @@ function optionalRow(show: Boolean, body: JSX.Element) {
 }
 
 function roleRow(role: Role) {
-  const deleteCross = <span className="
+  const deleteCross = <span className='
     cursor-pointer w-full px-2 my-1 inline-block
     bg-red-50 hover:bg-red-200
     text-center text-red-600 text-xl font-black 
-    "
+    '
   > <text > &times; </text> </span>
 
   const isEditableClass = role.isEditable ?
