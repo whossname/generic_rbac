@@ -5,6 +5,11 @@ from typing import List
 
 
 def user_has_permission(user_id, permission_name, require_write_access):
+    everyone_role = db.session.execute(select(Role).where(Role.is_everyone)).first()
+    if everyone_role is not None:
+        if everyone_role[0].has_permission(permission_name, require_write_access):
+            return True
+
     user_roles = db.session.execute(select(RoleUser).where(RoleUser.user_id == user_id)).all()
 
     for user_role in user_roles:
@@ -48,6 +53,16 @@ class Role(db.Model):
             'user_ids': [role_user.user_id for role_user in self.role_users],
             'role_permissions': [role_permission.to_json_for_role() for role_permission in self.role_permissions],
         }
+
+    def has_permission(self, permission_name, require_write_access) -> bool:
+        if self.is_super_admin:
+            return True
+
+        for role_permission in self.role_permissions:
+            if role_permission.permission.name == permission_name:
+                if not require_write_access or role_permission.write_access:
+                    return True
+        return False
 
 
 class RoleUser(db.Model):

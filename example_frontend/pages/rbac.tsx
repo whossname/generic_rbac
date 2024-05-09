@@ -1,32 +1,44 @@
 import { ReactElement } from 'react'
+import useSWR from 'swr'
+
+export interface SimplifiedRole {
+  name: string
+  users: string[]
+  permissions: string[]
+  isEditable: boolean
+}
+
+export interface ResponseError {
+  message: string
+}
 
 export async function getStaticProps (): Promise<Object> {
   return {
     props: {
-      pageId: 'rbac',
-      roles: []
+      pageId: 'rbac'
     }
   }
 }
 
-interface Role {
-  role_name: string
-  users: string[]
-  permissions: string[]
-  isEditable: Boolean
-  isDeletable: Boolean
+const fetcher = async (url: string): Promise<any> => {
+  const res = await fetch(url)
+  const data = await res.json()
+
+  if (res.status !== 200) {
+    throw new Error(data.message)
+  }
+  return data
 }
 
 export default function RBAC (): ReactElement {
-  const roles: Role[] = [
-    {
-      role_name: 'IT',
-      users: ['Ben', 'Brad', 'Steve'],
-      permissions: ['rbac'],
-      isEditable: true,
-      isDeletable: true
-    }
-  ]
+  const { data, error, isLoading } =
+    useSWR<SimplifiedRole[], ResponseError>(() => ('/api/rbac/fetch_all'), fetcher)
+
+  if (error !== undefined) return <div>{error.message}</div>
+  if (isLoading === true) return <div>Loading...</div>
+  if (data === undefined) return <div>Missing data</div>
+
+  const roles = data
 
   return (
     <section>
@@ -64,7 +76,7 @@ export default function RBAC (): ReactElement {
   )
 }
 
-function optionalRow (show: Boolean, body: JSX.Element): ReactElement {
+function optionalRow (show: boolean, body: JSX.Element): ReactElement {
   if (show) {
     return <td className='btn-cel'>{body}</td>
   } else {
@@ -72,7 +84,7 @@ function optionalRow (show: Boolean, body: JSX.Element): ReactElement {
   }
 }
 
-function roleRow (role: Role): ReactElement {
+function roleRow (role: SimplifiedRole): ReactElement {
   const deleteCross = (
     <span className='
     cursor-pointer w-full px-2 my-1 inline-block
@@ -88,9 +100,9 @@ function roleRow (role: Role): ReactElement {
     : ''
 
   return (
-    <tr key={role.role_name}>
-      {optionalRow(role.isDeletable, deleteCross)}
-      <td>{role.role_name}</td>
+    <tr key={role.name}>
+      {optionalRow(role.isEditable, deleteCross)}
+      <td>{role.name}</td>
       <td> <span className={isEditableClass}>{role.users.join(' - ')} </span> </td>
       <td> <span className={isEditableClass}>{role.permissions.join(' - ')} </span> </td>
     </tr>

@@ -3,8 +3,10 @@ from . import scripts
 from .. import db
 from ..models import RoleUser, Permission, RolePermission, Role
 
+from app import Base
 
-@scripts.cli.command('seed')
+
+@scripts.cli.command('seed_db')
 @click.argument('env')
 def seed(env):
     """run the seeds"""
@@ -15,7 +17,7 @@ def seed(env):
     admin = Role(name='Admin')
     everyone = Role(name='Everyone', is_everyone=True)
 
-    db.session.add_all([super_admin, admin, everyone])
+    db.session.add_all([super_admin, everyone, admin])
 
     # rbac permissions
     rbac_permission = Permission(name='rbac')
@@ -37,4 +39,13 @@ def seed(env):
             RoleUser(user_id='user', role=everyone)
         ])
     
+    db.session.commit()
+
+@scripts.cli.command('clean_db')
+@click.argument('env')
+def clean(env):
+    env = env or 'dev'
+    for tbl in reversed(Base.metadata.sorted_tables):
+        db.session.execute(tbl.delete())
+
     db.session.commit()
